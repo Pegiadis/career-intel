@@ -1,0 +1,4 @@
+Generate exactly 3 interview questions for this candidate and role.
+Matched skills: {matched}. Missing skills: {missing}.
+Mix: at least one probing a missing skill, at least one leveraging a matched strength.
+Return a JSON array of objects: {{"question": "...", "tag": "gap:<skill>" or "match:<skill>"}}.

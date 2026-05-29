@@ -19,3 +19,14 @@ class ChatRequest(BaseModel):
     resume_id: int
     job_id: int | None = None
     question: str
+
+
+class FitOut(BaseModel):
+    resume_id: int
+    job_id: int
+    fit_score: int
+    sub_scores: dict
+    matched_skills: list[str]
+    missing_skills: list[str]
+    summary: str
+    interview_questions: list[dict]

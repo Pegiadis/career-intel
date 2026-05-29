@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from db import init_db
-from routers import resumes, jobs, chat
+from routers import resumes, jobs, chat, fit
 
 
 @asynccontextmanager
@@ -17,6 +17,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:3000"],
 app.include_router(resumes.router)
 app.include_router(jobs.router)
 app.include_router(chat.router)
+app.include_router(fit.router)
 
 
 @app.get("/health")
