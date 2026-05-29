@@ -41,6 +41,11 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
                      retrieved_chunk_ids=[c.id for c in chunks],
                      latency_ms=int((time.monotonic() - start) * 1000)))
         db.commit()
+        from observability import log, trace_query
+        from services.guardrails import redact_pii
+        log.info("chat_query", q=redact_pii(req.question), job_id=req.job_id,
+                 chunks=len(chunks))
+        trace_query("chat", question=redact_pii(req.question), n_chunks=len(chunks))
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream")
