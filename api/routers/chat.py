@@ -1,10 +1,11 @@
 import time
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from db import SessionLocal
 from models import Query
 from schemas import ChatRequest
+from services.guardrails import check_query
 from services.embedder import Embedder
 from services.retriever import retrieve
 from services.chat import ChatService
@@ -22,6 +23,9 @@ def get_db():
 
 @router.post("")
 def chat(req: ChatRequest, db: Session = Depends(get_db)):
+    ok, msg = check_query(req.question)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
     vec, _ = Embedder().embed([req.question])
     chunks = retrieve(db, vec[0], req.resume_id, req.job_id, keyword=req.question[:40])
     svc = ChatService()
