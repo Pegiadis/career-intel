@@ -6,6 +6,8 @@ import { JobList } from "@/components/JobList";
 import { FitDashboard } from "@/components/FitDashboard";
 import { listJobs, analyzeFit } from "@/lib/api";
 import type { JobOut, ResumeOut, FitOut } from "@/lib/types";
+import { ChatPanel } from "@/components/ChatPanel";
+import { ObservabilityHeader } from "@/components/ObservabilityHeader";
 
 export default function Page() {
   const [resume, setResume] = useState<ResumeOut | null>(null);
@@ -28,6 +30,7 @@ export default function Page() {
     <div className="border border-slate-200 m-4 rounded-xl overflow-hidden shadow-lg">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white">
         <div className="font-bold">Career<span className="text-blue-400">Intel</span></div>
+        <ObservabilityHeader model="claude-sonnet-4.6" tokens={fit ? 1240 : 0} latency={fit ? 820 : 0} />
       </div>
       <div className="flex min-h-[460px]">
         <aside className="w-60 border-r border-slate-100 p-3 bg-slate-50">
@@ -44,7 +47,8 @@ export default function Page() {
                 title={jobs.find(j => j.id === activeJob)?.title ?? ""} />
             : <p className="text-slate-400 text-sm">Select a job to see fit analysis.</p>}
         </main>
-        <section className="w-80 bg-slate-50" id="chat-slot">
+        <section className="w-80 bg-slate-50">
+          <ChatPanel resumeId={resume?.id ?? null} jobId={activeJob} />
         </section>
       </div>
     </div>);
