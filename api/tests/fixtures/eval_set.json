@@ -1,0 +1,7 @@
+[
+  {"question": "What is my strongest backend language?", "expect_section": "skills", "expect_substring": "Python"},
+  {"question": "Where did I work most recently?", "expect_section": "experience", "expect_substring": "Engineer"},
+  {"question": "What degree do I hold?", "expect_section": "education", "expect_substring": "Science"},
+  {"question": "Do I know FastAPI?", "expect_section": "skills", "expect_substring": "FastAPI"},
+  {"question": "Have I built RAG systems?", "expect_section": "experience", "expect_substring": "RAG"}
+]
