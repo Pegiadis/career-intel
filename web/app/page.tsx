@@ -5,6 +5,7 @@ import { ResumeUpload } from "@/components/ResumeUpload";
 import { JobInput } from "@/components/JobInput";
 import { JobList } from "@/components/JobList";
 import { FitDashboard } from "@/components/FitDashboard";
+import { FitSkeleton } from "@/components/FitSkeleton";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ObservabilityHeader } from "@/components/ObservabilityHeader";
 import { listJobs, analyzeFit } from "@/lib/api";
@@ -23,6 +24,7 @@ export default function Page() {
   const [jobs, setJobs] = useState<JobOut[]>([]);
   const [activeJob, setActiveJob] = useState<number | null>(null);
   const [fit, setFit] = useState<FitOut | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [meta, setMeta] = useState({ tokens: 0, latency: 0 });
 
   const refresh = async () => setJobs(await listJobs());
@@ -33,13 +35,18 @@ export default function Page() {
     if (!resume) return;
     const t0 = performance.now();
     setFit(null);
-    const f = await analyzeFit(resume.id, id);
-    setFit(f);
-    setMeta({
-      tokens: 1200 + f.matched_skills.length * 90 + f.missing_skills.length * 70,
-      latency: Math.round(performance.now() - t0),
-    });
-    setJobs((js) => js.map((j) => (j.id === id ? { ...j, fit_score: f.fit_score } : j)));
+    setAnalyzing(true);
+    try {
+      const f = await analyzeFit(resume.id, id);
+      setFit(f);
+      setMeta({
+        tokens: 1200 + f.matched_skills.length * 90 + f.missing_skills.length * 70,
+        latency: Math.round(performance.now() - t0),
+      });
+      setJobs((js) => js.map((j) => (j.id === id ? { ...j, fit_score: f.fit_score } : j)));
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const activeMeta = jobs.find((j) => j.id === activeJob);
@@ -72,7 +79,12 @@ export default function Page() {
           <RailLabel>Résumé</RailLabel>
           <ResumeUpload onUploaded={setResume} />
           <RailLabel>Jobs · ranked by fit</RailLabel>
-          <JobList jobs={jobs} activeId={activeJob} onSelect={selectJob} />
+          <JobList
+            jobs={jobs}
+            activeId={activeJob}
+            loadingId={analyzing ? activeJob : null}
+            onSelect={selectJob}
+          />
           <div className="mt-2">
             <JobInput onAdded={refresh} />
           </div>
@@ -80,7 +92,9 @@ export default function Page() {
 
         {/* center */}
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-8">
-          {fit && activeJob ? (
+          {analyzing && activeJob ? (
+            <FitSkeleton company={activeMeta?.company ?? ""} title={activeMeta?.title ?? ""} />
+          ) : fit && activeJob ? (
             <FitDashboard
               fit={fit}
               company={activeMeta?.company ?? ""}

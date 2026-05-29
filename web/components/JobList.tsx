@@ -1,4 +1,5 @@
 "use client";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { JobOut } from "@/lib/types";
 
@@ -9,8 +10,8 @@ function scoreColor(s?: number) {
   return "text-low";
 }
 
-export function JobList({ jobs, activeId, onSelect }:
-  { jobs: JobOut[]; activeId: number | null; onSelect: (id: number) => void }) {
+export function JobList({ jobs, activeId, loadingId, onSelect }:
+  { jobs: JobOut[]; activeId: number | null; loadingId?: number | null; onSelect: (id: number) => void }) {
   if (jobs.length === 0) {
     return <p className="px-1 py-3 text-xs text-muted-foreground">No jobs yet — add one below.</p>;
   }
@@ -35,7 +36,11 @@ export function JobList({ jobs, activeId, onSelect }:
               <p className="truncate text-xs text-muted-foreground">{j.title}</p>
             </div>
             <span className={cn("ml-2 font-mono text-base font-bold tnum", scoreColor(j.fit_score))}>
-              {j.fit_score ?? "—"}
+              {loadingId === j.id ? (
+                <Loader2 className="size-4 animate-spin text-primary" />
+              ) : (
+                j.fit_score ?? "—"
+              )}
             </span>
           </button>
         );

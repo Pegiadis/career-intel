@@ -21,7 +21,7 @@ function ScoreRing({ score }: { score: number }) {
       <div
         className="absolute inset-0 rounded-full"
         style={{
-          background: `conic-gradient(${color} ${score}%, hsl(34 12% 16%) 0)`,
+          background: `conic-gradient(${color} ${score}%, hsl(214 32% 91%) 0)`,
           mask: "radial-gradient(farthest-side, transparent 70%, #000 71%)",
           WebkitMask: "radial-gradient(farthest-side, transparent 70%, #000 71%)",
         }}
