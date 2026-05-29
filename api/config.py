@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "claude-sonnet-4-6"
     embedding_dim: int = 1536
+    cors_origins: str = "http://localhost:3000,http://localhost:3001"
 
 
 settings = Settings()

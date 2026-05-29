@@ -27,27 +27,27 @@ export default function Page() {
   };
 
   return (
-    <div className="border border-slate-200 m-4 rounded-xl overflow-hidden shadow-lg">
+    <div className="h-screen flex flex-col">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white">
         <div className="font-bold">Career<span className="text-blue-400">Intel</span></div>
         <ObservabilityHeader model="claude-sonnet-4.6" tokens={fit ? 1240 : 0} latency={fit ? 820 : 0} />
       </div>
-      <div className="flex min-h-[460px]">
-        <aside className="w-60 border-r border-slate-100 p-3 bg-slate-50">
+      <div className="flex flex-1 min-h-0">
+        <aside className="w-60 border-r border-slate-100 p-3 bg-slate-50 overflow-y-auto">
           <div className="text-[10px] uppercase tracking-wide text-slate-400 mb-1.5">Resume</div>
           <ResumeUpload onUploaded={setResume} />
           <div className="text-[10px] uppercase tracking-wide text-slate-400 my-1.5">Jobs · ranked by fit</div>
           <JobList jobs={jobs} activeId={activeJob} onSelect={selectJob} />
           <JobInput onAdded={refresh} />
         </aside>
-        <main className="flex-1 p-4" id="center-slot">
+        <main className="flex-1 p-4 overflow-y-auto" id="center-slot">
           {fit && activeJob
             ? <FitDashboard fit={fit}
                 company={jobs.find(j => j.id === activeJob)?.company ?? ""}
                 title={jobs.find(j => j.id === activeJob)?.title ?? ""} />
             : <p className="text-slate-400 text-sm">Select a job to see fit analysis.</p>}
         </main>
-        <section className="w-80 bg-slate-50">
+        <section className="w-80 bg-slate-50 border-l border-slate-100">
           <ChatPanel resumeId={resume?.id ?? null} jobId={activeJob} />
         </section>
       </div>
