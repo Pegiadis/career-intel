@@ -1,37 +1,107 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { MessageSquareText, Send, Sparkles } from "lucide-react";
 import { streamChat } from "@/lib/sse";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 interface Msg { role: "me" | "ai"; text: string; }
 
 export function ChatPanel({ resumeId, jobId }: { resumeId: number | null; jobId: number | null }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const scrollDown = () =>
+    requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: "smooth" }));
 
   const send = async () => {
-    if (!input.trim() || resumeId == null) return;
-    const q = input; setInput("");
+    if (!input.trim() || resumeId == null || streaming) return;
+    const q = input;
+    setInput("");
     setMsgs((m) => [...m, { role: "me", text: q }, { role: "ai", text: "" }]);
-    await streamChat({ resume_id: resumeId, job_id: jobId, question: q }, (tok) => {
-      setMsgs((m) => {
-        const copy = [...m]; copy[copy.length - 1].text += tok; return copy; });
-    });
+    setStreaming(true);
+    scrollDown();
+    try {
+      await streamChat({ resume_id: resumeId, job_id: jobId, question: q }, (tok) => {
+        setMsgs((m) => {
+          const copy = [...m];
+          copy[copy.length - 1].text += tok;
+          return copy;
+        });
+        scrollDown();
+      });
+    } finally {
+      setStreaming(false);
+    }
   };
 
+  const disabled = resumeId == null;
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2.5 border-b border-slate-100 font-semibold text-[11px]">💬 Chat · grounded in resume + JD</div>
-      <div className="flex-1 p-3 overflow-auto space-y-2">
-        {msgs.map((m, i) => (
-          <div key={i} className={`rounded-xl px-2.5 py-1.5 text-[11px] leading-snug max-w-[88%]
-            ${m.role === "me" ? "bg-slate-900 text-white ml-auto" : "bg-blue-50 text-slate-800"}`}>
-            {m.text || "…"}</div>))}
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+        <MessageSquareText className="size-4 text-primary" />
+        <span className="text-sm font-medium">Chat</span>
+        <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          grounded
+        </span>
       </div>
-      <div className="p-2.5 border-t border-slate-100">
-        <input value={input} onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Ask about fit, gaps, or prep…"
-          className="w-full border border-slate-300 rounded-lg px-2.5 py-1.5 text-[11px]" />
+
+      <ScrollArea className="flex-1">
+        <div className="space-y-3 p-4">
+          {msgs.length === 0 && (
+            <div className="mt-10 flex flex-col items-center gap-2 text-center">
+              <div className="grid size-10 place-items-center rounded-full border border-border bg-card">
+                <Sparkles className="size-4 text-primary" />
+              </div>
+              <p className="max-w-[14rem] text-xs leading-relaxed text-muted-foreground">
+                {disabled
+                  ? "Upload a résumé to start chatting about fit and gaps."
+                  : "Ask anything — answers cite your résumé and the job description."}
+              </p>
+            </div>
+          )}
+          {msgs.map((m, i) => {
+            const last = i === msgs.length - 1;
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "max-w-[90%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed animate-fade-up",
+                  m.role === "me"
+                    ? "ml-auto rounded-br-md bg-primary text-primary-foreground"
+                    : "rounded-bl-md border border-border bg-card text-foreground/90",
+                )}
+              >
+                {m.text}
+                {m.role === "ai" && last && streaming && (
+                  <span className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-0.5 animate-pulse-soft bg-primary" />
+                )}
+              </div>
+            );
+          })}
+          <div ref={endRef} />
+        </div>
+      </ScrollArea>
+
+      <div className="border-t border-border p-3">
+        <div className="flex items-center gap-2">
+          <Input
+            value={input}
+            disabled={disabled || streaming}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder={disabled ? "Upload a résumé first…" : "Ask about fit, gaps, or prep…"}
+          />
+          <Button size="icon" onClick={send} disabled={disabled || streaming || !input.trim()}>
+            <Send className="size-4" />
+          </Button>
+        </div>
       </div>
-    </div>);
+    </div>
+  );
 }

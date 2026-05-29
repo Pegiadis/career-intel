@@ -1,11 +1,33 @@
+import { Target } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import type { FitOut } from "@/lib/types";
+
 export function InterviewPrep({ questions }: { questions: FitOut["interview_questions"] }) {
   return (
-    <div className="border border-slate-200 rounded-lg p-2.5 mt-4">
-      <h4 className="text-xs font-semibold mb-1.5">🎯 Interview prep — generated for this role</h4>
-      {questions.map((q, i) => (
-        <div key={i} className="py-1.5 border-b border-dashed border-slate-100 last:border-0 text-xs">
-          "{q.question}" <span className="text-[9px] bg-blue-100 text-blue-700 rounded px-1.5 py-0.5">{q.tag}</span>
-        </div>))}
-    </div>);
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Target className="size-4 text-primary" />
+        <h3 className="font-display text-lg">Interview prep</h3>
+        <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+          generated for this role
+        </span>
+      </div>
+      <div className="space-y-2">
+        {questions.map((q, i) => {
+          const gap = q.tag?.startsWith("gap");
+          return (
+            <div
+              key={i}
+              className="rounded-lg border border-border bg-card/40 p-3.5 transition-colors hover:bg-card/70"
+            >
+              <p className="text-sm leading-relaxed text-foreground/90">{q.question}</p>
+              <Badge variant={gap ? "low" : "good"} className="mt-2 font-mono text-[10px]">
+                {q.tag}
+              </Badge>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }

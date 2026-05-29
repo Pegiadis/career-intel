@@ -1,2 +1,92 @@
-@tailwind base; @tailwind components; @tailwind utilities;
-body { background:#fff; color:#11151c; font-family: ui-sans-serif, system-ui; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm "intelligence dossier" dark theme */
+    --background: 28 12% 6%;
+    --foreground: 40 28% 90%;
+
+    --card: 30 10% 9%;
+    --card-foreground: 40 28% 90%;
+
+    --popover: 30 10% 8%;
+    --popover-foreground: 40 28% 90%;
+
+    --primary: 36 92% 60%;          /* amber / gold accent */
+    --primary-foreground: 30 40% 8%;
+
+    --secondary: 30 8% 14%;
+    --secondary-foreground: 40 24% 88%;
+
+    --muted: 30 8% 14%;
+    --muted-foreground: 38 12% 58%;
+
+    --accent: 36 92% 60%;
+    --accent-foreground: 30 40% 8%;
+
+    --border: 34 12% 17%;
+    --input: 34 12% 17%;
+    --ring: 36 92% 60%;
+
+    /* semantic fit colors */
+    --good: 152 56% 52%;            /* emerald */
+    --mid: 40 95% 58%;             /* amber  */
+    --low: 352 84% 64%;            /* rose   */
+
+    --radius: 0.85rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* atmospheric warmth: faint gold glow + deep vignette */
+    background-image:
+      radial-gradient(900px 500px at 12% -8%, hsl(36 92% 60% / 0.10), transparent 60%),
+      radial-gradient(800px 600px at 110% 0%, hsl(20 70% 40% / 0.08), transparent 55%);
+    background-attachment: fixed;
+  }
+
+  /* fine grain overlay for texture */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(34 12% 22%);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(36 40% 35%);
+    background-clip: padding-box;
+  }
+
+  /* numeric figures look crisp in mono */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
