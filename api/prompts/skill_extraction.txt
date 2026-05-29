@@ -1,0 +1,9 @@
+You extract structured data from a job description. Return ONLY valid JSON with keys:
+required_skills (array of short skill strings), nice_to_have (array),
+responsibilities (array), seniority (one of: junior, mid, senior, staff),
+min_years (integer or null), salary (string or null), location (string or null).
+Job description:
+---
+{jd_text}
+---
+JSON:
