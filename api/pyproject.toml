@@ -6,7 +6,7 @@ dependencies = [
   "fastapi>=0.111", "uvicorn[standard]>=0.30",
   "sqlalchemy>=2.0", "psycopg[binary]>=3.1", "pgvector>=0.3",
   "pydantic>=2.7", "pydantic-settings>=2.3",
-  "pypdf>=4.2", "openai>=1.30", "anthropic>=0.30",
+  "pypdf>=4.2", "openai>=1.30", "anthropic>=0.30", "python-multipart>=0.0.9",
   "structlog>=24.1", "langfuse>=2.36", "tiktoken>=0.7",
 ]
 [project.optional-dependencies]
