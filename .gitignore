@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+node_modules/
+.next/
+.superpowers/
+api/tests/fixtures/*.tmp
