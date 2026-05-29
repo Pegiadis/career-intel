@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { ResumeUpload } from "@/components/ResumeUpload";
 import { JobInput } from "@/components/JobInput";
 import { JobList } from "@/components/JobList";
+import { FitDashboard } from "@/components/FitDashboard";
 import { listJobs, analyzeFit } from "@/lib/api";
 import type { JobOut, ResumeOut, FitOut } from "@/lib/types";
 
@@ -37,8 +38,11 @@ export default function Page() {
           <JobInput onAdded={refresh} />
         </aside>
         <main className="flex-1 p-4" id="center-slot">
-          {fit ? <pre className="text-xs">{JSON.stringify(fit, null, 2)}</pre>
-               : <p className="text-slate-400 text-sm">Select a job to see fit analysis.</p>}
+          {fit && activeJob
+            ? <FitDashboard fit={fit}
+                company={jobs.find(j => j.id === activeJob)?.company ?? ""}
+                title={jobs.find(j => j.id === activeJob)?.title ?? ""} />
+            : <p className="text-slate-400 text-sm">Select a job to see fit analysis.</p>}
         </main>
         <section className="w-80 bg-slate-50" id="chat-slot">
         </section>
