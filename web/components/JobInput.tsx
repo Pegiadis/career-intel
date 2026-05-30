@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Plus, Loader2 } from "lucide-react";
 import { addJob } from "@/lib/api";
+import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,8 @@ export function JobInput({ onAdded }: { onAdded: () => void }) {
               setOpen(false);
               setTitle(""); setCompany(""); setText("");
               onAdded();
+            } catch {
+              toast.error("Couldn't add the job. Is the API running?");
             } finally {
               setBusy(false);
             }

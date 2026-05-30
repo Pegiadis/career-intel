@@ -9,6 +9,7 @@ import { FitSkeleton } from "@/components/FitSkeleton";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ObservabilityHeader } from "@/components/ObservabilityHeader";
 import { listJobs, analyzeFit, getLatestResume } from "@/lib/api";
+import { toast } from "@/components/ui/toast";
 import type { JobOut, ResumeOut, FitOut } from "@/lib/types";
 
 function RailLabel({ children }: { children: React.ReactNode }) {
@@ -54,6 +55,8 @@ export default function Page() {
         latency: Math.round(performance.now() - t0),
       });
       setJobs((js) => js.map((j) => (j.id === id ? { ...j, fit_score: f.fit_score } : j)));
+    } catch {
+      toast.error("Fit analysis failed. Is the API running?");
     } finally {
       setAnalyzing(false);
     }

@@ -2,12 +2,31 @@
 import { useRef, useState } from "react";
 import { MessageSquareText, Send, Sparkles } from "lucide-react";
 import { streamChat } from "@/lib/sse";
+import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 interface Msg { role: "me" | "ai"; text: string; }
+
+const CITE = /(\[[^\]]*§[^\]]*\])/g;
+
+function renderAnswer(text: string) {
+  return text.split(CITE).map((part, i) =>
+    /^\[[^\]]*§[^\]]*\]$/.test(part) ? (
+      <span
+        key={i}
+        title="Source citation"
+        className="mx-0.5 inline-flex cursor-help items-center rounded bg-primary/10 px-1.5 py-0.5 align-baseline font-mono text-[10px] font-medium text-primary"
+      >
+        {part.replace(/[[\]]/g, "")}
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
 
 export function ChatPanel({ resumeId, jobId }: { resumeId: number | null; jobId: number | null }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -34,6 +53,8 @@ export function ChatPanel({ resumeId, jobId }: { resumeId: number | null; jobId:
         });
         scrollDown();
       });
+    } catch {
+      toast.error("Chat request failed. Is the API running?");
     } finally {
       setStreaming(false);
     }
@@ -77,7 +98,7 @@ export function ChatPanel({ resumeId, jobId }: { resumeId: number | null; jobId:
                     : "rounded-bl-md border border-border bg-card text-foreground/90",
                 )}
               >
-                {m.text}
+                {m.role === "ai" ? renderAnswer(m.text) : m.text}
                 {m.role === "ai" && last && streaming && (
                   <span className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-0.5 animate-pulse-soft bg-primary" />
                 )}

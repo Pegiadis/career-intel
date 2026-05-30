@@ -4,6 +4,7 @@ import { FileText, Loader2, UploadCloud, CheckCircle2 } from "lucide-react";
 import { uploadResume } from "@/lib/api";
 import type { ResumeOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { toast } from "@/components/ui/toast";
 
 export function ResumeUpload({ onUploaded, current }:
   { onUploaded: (r: ResumeOut) => void; current?: ResumeOut | null }) {
@@ -18,6 +19,8 @@ export function ResumeUpload({ onUploaded, current }:
       const r = await uploadResume(f);
       setResume(r);
       onUploaded(r);
+    } catch {
+      toast.error("Couldn't process that résumé. Is the API running?");
     } finally {
       setLoading(false);
     }
