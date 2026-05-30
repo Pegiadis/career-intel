@@ -5,10 +5,12 @@ import { uploadResume } from "@/lib/api";
 import type { ResumeOut } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function ResumeUpload({ onUploaded }: { onUploaded: (r: ResumeOut) => void }) {
+export function ResumeUpload({ onUploaded, current }:
+  { onUploaded: (r: ResumeOut) => void; current?: ResumeOut | null }) {
   const [resume, setResume] = useState<ResumeOut | null>(null);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const shown = resume ?? current ?? null;
 
   const handle = async (f: File) => {
     setLoading(true);
@@ -21,17 +23,17 @@ export function ResumeUpload({ onUploaded }: { onUploaded: (r: ResumeOut) => voi
     }
   };
 
-  if (resume) {
+  if (shown) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-good/25 bg-good/5 p-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-good/15 text-good">
           <FileText className="size-4" />
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{resume.filename}</p>
+          <p className="truncate text-sm font-medium">{shown.filename}</p>
           <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground tnum">
             <CheckCircle2 className="size-3 text-good" />
-            {resume.section_count} sections · {resume.chunk_count} chunks
+            {shown.section_count} sections · {shown.chunk_count} chunks
           </p>
         </div>
       </div>

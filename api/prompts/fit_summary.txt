@@ -1,3 +1,4 @@
-Given matched skills {matched}, missing skills {missing}, and seniority match {seniority},
-write a 2-3 sentence recruiter-style summary of this candidate's fit for the role.
-Be specific and end with one actionable recommendation. Plain prose, no markdown.
+You are advising the candidate directly. Given their matched skills {matched}, missing
+skills {missing}, and seniority match {seniority}, write a 2-3 sentence summary in the
+second person ("you") of how well they fit this role. Be specific and end with one
+actionable recommendation. Plain prose, no markdown.

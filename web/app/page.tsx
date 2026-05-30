@@ -8,7 +8,7 @@ import { FitDashboard } from "@/components/FitDashboard";
 import { FitSkeleton } from "@/components/FitSkeleton";
 import { ChatPanel } from "@/components/ChatPanel";
 import { ObservabilityHeader } from "@/components/ObservabilityHeader";
-import { listJobs, analyzeFit } from "@/lib/api";
+import { listJobs, analyzeFit, getLatestResume } from "@/lib/api";
 import type { JobOut, ResumeOut, FitOut } from "@/lib/types";
 
 function RailLabel({ children }: { children: React.ReactNode }) {
@@ -27,8 +27,18 @@ export default function Page() {
   const [analyzing, setAnalyzing] = useState(false);
   const [meta, setMeta] = useState({ tokens: 0, latency: 0 });
 
-  const refresh = async () => setJobs(await listJobs());
-  useEffect(() => { refresh(); }, []);
+  const refresh = async (rid?: number) => setJobs(await listJobs(rid ?? resume?.id));
+  useEffect(() => {
+    (async () => {
+      const r = await getLatestResume();
+      if (r) {
+        setResume(r);
+        setJobs(await listJobs(r.id));
+      } else {
+        setJobs(await listJobs());
+      }
+    })();
+  }, []);
 
   const selectJob = async (id: number) => {
     setActiveJob(id);
@@ -77,7 +87,7 @@ export default function Page() {
         {/* left rail */}
         <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-border bg-card/20 p-4">
           <RailLabel>Résumé</RailLabel>
-          <ResumeUpload onUploaded={setResume} />
+          <ResumeUpload current={resume} onUploaded={(r) => { setResume(r); refresh(r.id); }} />
           <RailLabel>Jobs · ranked by fit</RailLabel>
           <JobList
             jobs={jobs}

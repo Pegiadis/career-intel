@@ -31,8 +31,7 @@ def _resume_years(resume: Resume) -> int:
     return (max(yrs) - min(yrs)) if len(yrs) >= 2 else 5
 
 
-@router.post("/{resume_id}/{job_id}", response_model=FitOut)
-def analyze(resume_id: int, job_id: int, db: Session = Depends(get_db)):
+def analyze_fit(db: Session, resume_id: int, job_id: int) -> dict:
     resume = db.get(Resume, resume_id)
     job = db.get(Job, job_id)
     jd = job.parsed_jd
@@ -69,6 +68,12 @@ def analyze(resume_id: int, job_id: int, db: Session = Depends(get_db)):
                          matched_skills=matched_req, missing_skills=missing_req,
                          sub_scores=fit["sub_scores"], summary=summary))
     db.commit()
-    return FitOut(resume_id=resume_id, job_id=job_id, fit_score=fit["fit_score"],
-                  sub_scores=fit["sub_scores"], matched_skills=matched_req,
-                  missing_skills=missing_req, summary=summary, interview_questions=questions)
+    return {"resume_id": resume_id, "job_id": job_id, "fit_score": fit["fit_score"],
+            "sub_scores": fit["sub_scores"], "matched_skills": matched_req,
+            "missing_skills": missing_req, "summary": summary,
+            "interview_questions": questions}
+
+
+@router.post("/{resume_id}/{job_id}", response_model=FitOut)
+def analyze(resume_id: int, job_id: int, db: Session = Depends(get_db)):
+    return FitOut(**analyze_fit(db, resume_id, job_id))

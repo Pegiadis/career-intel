@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from db import SessionLocal
 from models import Resume, Chunk
@@ -44,6 +44,16 @@ async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_
     finally:
         os.unlink(path)
     resume = ingest_resume(db, file.filename or "resume.pdf", raw, Embedder())
+    n_chunks = db.query(Chunk).filter_by(source_type="resume", source_id=resume.id).count()
+    return ResumeOut(id=resume.id, filename=resume.filename,
+                     section_count=len(resume.parsed_sections), chunk_count=n_chunks)
+
+
+@router.get("/latest", response_model=ResumeOut)
+def latest_resume(db: Session = Depends(get_db)):
+    resume = db.query(Resume).order_by(Resume.id.desc()).first()
+    if not resume:
+        raise HTTPException(status_code=404, detail="no resume")
     n_chunks = db.query(Chunk).filter_by(source_type="resume", source_id=resume.id).count()
     return ResumeOut(id=resume.id, filename=resume.filename,
                      section_count=len(resume.parsed_sections), chunk_count=n_chunks)

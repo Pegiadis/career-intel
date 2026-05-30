@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from db import SessionLocal
-from models import Job, Chunk
+from models import Job, Chunk, FitAnalysis
 from services.jd_parser import JdParser
 from services.chunker import chunk_text
 from services.embedder import Embedder
@@ -49,5 +49,11 @@ def create_job(data: JobIn, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[JobOut])
-def list_jobs(db: Session = Depends(get_db)):
-    return [JobOut(id=j.id, title=j.title, company=j.company) for j in db.query(Job).all()]
+def list_jobs(resume_id: int | None = None, db: Session = Depends(get_db)):
+    jobs = db.query(Job).all()
+    scores: dict[int, int] = {}
+    if resume_id is not None:
+        for fa in db.query(FitAnalysis).filter_by(resume_id=resume_id).all():
+            scores[fa.job_id] = fa.fit_score
+    return [JobOut(id=j.id, title=j.title, company=j.company, fit_score=scores.get(j.id))
+            for j in jobs]

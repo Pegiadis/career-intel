@@ -2,6 +2,7 @@
 from db import SessionLocal, init_db
 from routers.resumes import ingest_resume
 from routers.jobs import ingest_job, JobIn
+from routers.fit import analyze_fit
 from services.embedder import Embedder
 from services.jd_parser import JdParser
 
@@ -33,9 +34,10 @@ JOBS = [
 def main():
     init_db()
     db = SessionLocal()
-    ingest_resume(db, "alex_carter_resume.pdf", RESUME, Embedder())
+    resume = ingest_resume(db, "alex_carter_resume.pdf", RESUME, Embedder())
     for job in JOBS:
-        ingest_job(db, job, JdParser(), Embedder())
+        j = ingest_job(db, job, JdParser(), Embedder())
+        analyze_fit(db, resume.id, j.id)
     db.close()
     print("seeded.")
 
