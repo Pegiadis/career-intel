@@ -6,7 +6,9 @@ class FakeClient:
         pass
 
 class FakeEmbeddings:
-    def __init__(self, dim): self.dim = dim; self.calls = 0
+    def __init__(self, dim):
+        self.dim = dim
+        self.calls = 0
     def create(self, model, input):
         self.calls += 1
         data = [type("E", (), {"embedding": [0.1] * self.dim})() for _ in input]
