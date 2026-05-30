@@ -108,7 +108,7 @@ What I'd change to run this for real:
 | **Orchestration** | None — direct SDK calls | Full control over prompt construction, retries, and observability. LangChain's abstractions would hide exactly the parts I want to be able to debug and tune. |
 | **Prompt & context mgmt** | Prompts as versioned files in `api/prompts/`; context built with explicit `[resume §section]` / `[JD §jd]` tags | Prompts are diffable and iterable without code changes; the tag format gives the model a citation contract. |
 | **Guardrails** | Query length cap, empty-query rejection, PII redaction in logs, "not in your resume" fallback | Cheap, defensible safety; keeps the assistant on-topic and avoids logging personal data. |
-| **Quality** | **Deterministic fit score** + a 5-case retrieval eval set in pytest | The score is *computed* (skill coverage + seniority), not invented by the LLM — it's explainable and reproducible. The LLM only writes prose on top. |
+| **Quality** | **Deterministic fit score** + retrieval-recall eval + **LLM-as-judge groundedness gate** in CI | The score is *computed* (skill coverage + seniority), not invented by the LLM — explainable and reproducible. Chat answers are separately scored for faithfulness to the retrieved context, and that gate runs in CI. |
 | **Observability** | structlog (JSON, request-scoped) + Langfuse tracing + live token/latency in the UI header | You can see per-query cost and latency at a glance, and trace any answer. |
 
 **The decision I care most about:** the fit score is deterministic. `required_coverage*0.5 +
@@ -132,8 +132,9 @@ identical on every run.
 > ✍️ **In my words** — *Ioannis: this honesty is deliberate; adjust to match what you actually value.*
 
 **Followed:** containerized (one `docker compose up`); typed end-to-end (pydantic + SQLAlchemy 2.0 +
-TS strict); tested against a **real** Postgres (no mocked DB) including a retrieval eval set;
-structured JSON logging; file-based prompts; secrets via env with a committed `.env.example`.
+TS strict); tested against a **real** Postgres (no mocked DB) including a retrieval-recall eval set
+**and an LLM-as-judge groundedness gate**; **GitHub Actions CI** (lint + unit + eval); structured
+JSON logging; file-based prompts; secrets via env with a committed `.env.example`.
 
 **Skipped (deliberately, for a take-home) — and what I'd add:**
 
