@@ -1,17 +1,57 @@
-# Career Intelligence Assistant
+# CareerIntel — Career Intelligence Assistant
 
-Analyze a resume against multiple job descriptions: an **explainable** fit score, skill-gap
-analysis, auto-generated interview questions, and a grounded chat that cites its sources.
+Analyze a résumé against multiple job descriptions and get back an **explainable** fit score,
+a skill-gap breakdown, tailored interview questions, and a **grounded chat** that cites its
+sources. Built for the NewPage take-home (Option 4).
 
-Built for the NewPage take-home (Option 4).
+![Fit dashboard](docs/screenshot-dashboard.png)
 
-> ✍️ **Note to NewPage reviewers:** the sections marked **✍️ In my words** below are written by me,
-> not generated. The brief asked for my thinking and my judgment about where LLM output is and isn't
-> appropriate — those sections are where I articulate the *why* behind the build.
+> **Note to reviewers:** the sections tagged **✍️ In my words** are written by me, not generated.
+> The brief asked for my reasoning and my judgment about where LLM output is and isn't appropriate —
+> those sections are where I articulate the *why*.
 
 ---
 
-## Quick setup
+## Table of contents
+
+- [What it does](#what-it-does)
+- [Quick start](#quick-start)
+- [Architecture](#architecture)
+- [Data model](#data-model)
+- [The RAG pipeline, step by step](#the-rag-pipeline-step-by-step)
+- [Fit scoring: deterministic, not vibes](#fit-scoring-deterministic-not-vibes)
+- [Quality, evals & observability](#quality-evals--observability)
+- [API reference](#api-reference)
+- [Project layout](#project-layout)
+- [Testing & CI](#testing--ci)
+- [RAG / LLM decisions](#rag--llm-decisions)
+- [Key technical decisions](#key-technical-decisions)
+- [Engineering standards followed (and skipped)](#engineering-standards-followed-and-skipped)
+- [Productionizing](#productionizing)
+- [How I used AI tools](#how-i-used-ai-tools-in-development)
+- [What I'd do differently with more time](#what-id-do-differently-with-more-time)
+- [Screenshots](#screenshots)
+
+---
+
+## What it does
+
+The user is a **job-seeker**. They:
+
+1. **Upload a résumé** (PDF). It's parsed into sections, chunked, embedded, and stored as vectors.
+2. **Add job descriptions** (paste text). Claude extracts each one's structured requirements
+   (required skills, nice-to-haves, seniority, min years).
+3. **Select a job** → see an **explainable fit score**, matched vs. missing skills, a written
+   fit summary (addressed to the candidate), and **interview questions** generated for that role.
+4. **Chat** → ask anything ("What am I missing for this role?", "How does my experience align?").
+   Answers are retrieved from the résumé + JD and **cite the exact source sections**.
+
+The product is intentionally candidate-side; the same engine flips trivially to a recruiter view
+(one JD → many résumés) — noted under [what I'd do differently](#what-id-do-differently-with-more-time).
+
+---
+
+## Quick start
 
 **Prerequisites:** Docker + Docker Compose, an OpenAI API key, an Anthropic API key.
 
@@ -20,27 +60,28 @@ Built for the NewPage take-home (Option 4).
 cp .env.example .env
 #    edit .env → set OPENAI_API_KEY and ANTHROPIC_API_KEY
 
-# 2. Bring up the stack (Postgres+pgvector, FastAPI, Next.js)
+# 2. Build & start the stack (Postgres+pgvector, FastAPI, Next.js)
 docker compose up --build
 
-# 3. In another terminal, seed anonymized demo data (1 resume + 3 jobs)
+# 3. In another terminal, seed anonymized demo data (1 résumé + 3 jobs, fit precomputed)
 docker compose run --rm api python seed.py
 
 # 4. Open the app
-#    Web UI : http://localhost:3000
-#    API docs: http://localhost:8000/docs
+#    Web UI  : http://localhost:3000
+#    API docs: http://localhost:8000/docs   (interactive Swagger)
 ```
 
-Run the test suite (no API keys required — all external calls are faked in tests):
+**Run the tests** (the unit + retrieval suite needs no API keys — all external clients are faked):
 
 ```bash
-docker compose run --rm api pytest -q     # 21 tests
+docker compose run --rm api pytest -q -m "not eval"   # 21 tests, no keys
+docker compose run --rm api pytest -q                  # 22 tests, incl. live LLM-judge eval
 ```
 
-> **Port note:** the dev Postgres is published on host port **5434** (not 5432) so it won't collide
-> with an existing local Postgres. Inside the Docker network the database is always `db:5432`, so
-> nothing else changes. If host port 3000 or 8000 is already in use on your machine, remap the
-> `web`/`api` `ports:` entries in `docker-compose.yml`.
+> **Port note:** Postgres is published on host port **5434** (not 5432) to avoid colliding with a
+> local Postgres. Inside the Docker network the DB is always `db:5432`, so `DATABASE_URL` is
+> unaffected. If host port 3000/8000 is taken, remap the `web`/`api` `ports:` in
+> `docker-compose.yml` and set `NEXT_PUBLIC_API_URL` to match.
 
 ---
 
@@ -48,95 +89,220 @@ docker compose run --rm api pytest -q     # 21 tests
 
 ```mermaid
 flowchart LR
-    subgraph Browser
-        UI[Next.js workspace<br/>rail · fit dashboard · chat]
+    subgraph Browser["Next.js workspace"]
+        RAIL[Résumé rail<br/>jobs ranked by fit]
+        DASH[Fit dashboard<br/>score · gaps · questions]
+        CHAT[Grounded chat]
     end
-    subgraph API[FastAPI]
-        R[/resumes/]
-        J[/jobs/]
-        F[/fit/]
-        C[/chat SSE/]
-        SVC[services:<br/>parser · chunker · embedder<br/>retriever · skill_matcher<br/>fit_analyzer · guardrails]
-    end
-    DB[(Postgres + pgvector)]
-    OAI[OpenAI<br/>embeddings]
-    ANT[Anthropic<br/>Claude Sonnet]
-    LF[Langfuse]
 
-    UI -->|REST + SSE| API
+    subgraph API["FastAPI"]
+        R["/resumes"]
+        J["/jobs"]
+        F["/fit"]
+        C["/chat (SSE)"]
+        SVC["services:<br/>pdf_parser · chunker · embedder<br/>jd_parser · retriever · skill_matcher<br/>fit_analyzer · guardrails · chat"]
+    end
+
+    DB[("Postgres + pgvector")]
+    OAI["OpenAI<br/>text-embedding-3-small"]
+    ANT["Anthropic<br/>Claude Sonnet 4.6"]
+    LF["Langfuse"]
+
+    RAIL & DASH & CHAT -->|REST + SSE| API
     R & J & F & C --> SVC
     SVC --> DB
-    SVC --> OAI
-    SVC --> ANT
+    SVC -->|embed| OAI
+    SVC -->|extract · summarize · chat| ANT
     SVC -.trace.-> LF
 ```
 
-**Flow:** Upload a resume (PDF → section-aware chunks → embeddings → pgvector). Add job
-descriptions (Claude extracts structured `required_skills`/`nice_to_have`/`seniority` → JSONB;
-raw text chunked for chat grounding). Selecting a job computes a deterministic fit score, then
-Claude writes a prose summary and tailored interview questions on top of the numbers. The chat
-retrieves resume+JD chunks (hybrid vector+keyword) and answers with citations.
-
-Module layout: `api/services/` holds one focused module per responsibility; `api/routers/` exposes
-them; `api/prompts/` keeps prompts as versioned files (not buried in code); `web/components/` is one
-component per UI surface. See `docs/superpowers/specs/` for the full design spec.
+Three containers, one command. The frontend talks to the API over REST + Server-Sent Events
+(for token streaming). The API owns all retrieval, scoring, and orchestration; it calls OpenAI for
+embeddings and Anthropic for extraction/summarization/chat. Postgres with the `pgvector` extension
+stores both the relational data and the embeddings — one datastore, no second system.
 
 ---
 
-## Productionizing (AWS/GCP/Azure)
+## Data model
 
-> ✍️ **In my words** — *Ioannis: replace this with your own take; draft below to react to.*
+Five tables (`api/models/`):
 
-What I'd change to run this for real:
-- **Database:** swap the self-hosted pgvector container for a managed Postgres with pgvector (AWS RDS/Aurora, GCP Cloud SQL) — or a dedicated vector store if scale demanded it. Add an IVFFlat/HNSW index on the `chunks.embedding` column (the demo dataset is tiny, so a flat scan is fine; at >100k chunks an index matters).
-- **Object storage:** store uploaded PDFs in S3/GCS, not on the API box; ingest async.
-- **Compute:** containers already; deploy api + web on ECS Fargate / Cloud Run behind a load balancer; secrets in a secrets manager, not `.env`.
-- **Scale & cost:** cache embeddings (identical chunks shouldn't be re-embedded); batch the embedding calls (already batched per document); add a rate limiter (Redis token bucket) on the chat endpoint.
-- **Reliability:** retries/backoff on the LLM/embedding calls; circuit breaker; a fallback "retrieval-only" answer if the LLM is down.
-- **Eval in CI:** run the retrieval eval set on every PR and fail the build if recall drops.
-
-## RAG / LLM approach & decisions
-
-> ✍️ **In my words** — *Ioannis: this section is the heart of what they grade. Make the reasoning yours. Factual choices below are accurate; rewrite the prose in your voice.*
-
-| Decision point | Choice | Why |
+| Table | Purpose | Notable columns |
 |---|---|---|
-| **Chunking** | Section-aware for resumes (one chunk per Experience/Skills/Education section); recursive ~1800-char windows with overlap for JDs | Resumes are short and highly structured — splitting by section keeps whole bullets intact and lets retrieval filter by section. JDs are prose, so a sliding window is the right default. |
-| **Embedding model** | OpenAI `text-embedding-3-small` (1536-dim) | Cheap, fast, strong quality for short text; 1536 dims is plenty for this corpus size. |
-| **LLM** | Anthropic Claude Sonnet 4.6 | Best reasoning for the summary + interview-question generation; strong at following the "cite your source" instruction. |
-| **Vector DB** | Postgres + pgvector | One store for both relational data and vectors — no second system, no vendor lock-in for a take-home. Honest trade-off: at very large scale I'd revisit a dedicated vector DB and a proper ANN index. |
-| **Orchestration** | None — direct SDK calls | Full control over prompt construction, retries, and observability. LangChain's abstractions would hide exactly the parts I want to be able to debug and tune. |
-| **Prompt & context mgmt** | Prompts as versioned files in `api/prompts/`; context built with explicit `[resume §section]` / `[JD §jd]` tags | Prompts are diffable and iterable without code changes; the tag format gives the model a citation contract. |
-| **Guardrails** | Query length cap, empty-query rejection, PII redaction in logs, "not in your resume" fallback | Cheap, defensible safety; keeps the assistant on-topic and avoids logging personal data. |
-| **Quality** | **Deterministic fit score** + retrieval-recall eval + **LLM-as-judge groundedness gate** in CI | The score is *computed* (skill coverage + seniority), not invented by the LLM — explainable and reproducible. Chat answers are separately scored for faithfulness to the retrieved context, and that gate runs in CI. |
-| **Observability** | structlog (JSON, request-scoped) + Langfuse tracing + live token/latency in the UI header | You can see per-query cost and latency at a glance, and trace any answer. |
+| `resumes` | uploaded résumé | `raw_text`, `parsed_sections` (JSONB) |
+| `jobs` | a job description | `raw_text`, `parsed_jd` (JSONB: skills, seniority, min_years) |
+| `chunks` | embedded text units | `source_type` (resume\|job), `section`, `content`, `embedding VECTOR(1536)` |
+| `fit_analyses` | a résumé×job result | `fit_score`, `matched_skills`, `missing_skills`, `sub_scores`, `summary` |
+| `queries` | chat audit log | `question`, `retrieved_chunk_ids`, `latency_ms`, `tokens_used` |
 
-**The decision I care most about:** the fit score is deterministic. `required_coverage*0.5 +
-nice_to_have*0.2 + seniority*0.3`, rounded to an integer. The LLM never produces the percentage —
-it only writes the summary explaining it. That means the number is defensible, debuggable, and
-identical on every run.
+JD extraction and résumé parsing happen **once at ingestion** and are stored as JSONB, so reads
+never re-parse. `fit_analyses` is persisted, which is what lets the rail show scores on page load.
+
+---
+
+## The RAG pipeline, step by step
+
+**Ingesting a résumé** (`services/pdf_parser.py`, `chunker.py`, `embedder.py`):
+1. `pypdf` extracts text; a heading regex splits it into sections (Summary, Experience, Skills,
+   Education, …).
+2. **Section-aware chunking** — one chunk per section. Résumés are short and structured, so this
+   keeps whole bullets intact and lets retrieval filter by section.
+3. OpenAI `text-embedding-3-small` embeds the chunks in a single batched call (token count tracked).
+4. Chunks + 1536-dim vectors are written to `pgvector`.
+
+**Ingesting a job** (`services/jd_parser.py`):
+1. One Claude call converts the messy JD prose into structured JSON
+   (`required_skills`, `nice_to_have`, `responsibilities`, `seniority`, `min_years`) → stored as JSONB.
+2. The raw JD is also recursively chunked + embedded so the chat can ground answers in it.
+
+**Retrieval** (`services/retriever.py`):
+- **Hybrid**: pgvector cosine distance for semantic recall **plus** an `ILIKE` keyword pass for
+  exact-token precision (e.g. "Kubernetes"), filtered to the active résumé + selected job.
+
+**Chat** (`services/chat.py`, `routers/chat.py`):
+- Retrieved chunks are formatted with explicit `[resume §section]` / `[JD §section]` tags. The system
+  prompt requires the model to cite those tags after each claim and to say *"that isn't in your
+  résumé / the job description"* when retrieval is empty (anti-hallucination). Tokens stream to the
+  UI over SSE; the frontend renders the citation tags as chips.
+
+---
+
+## Fit scoring: deterministic, not vibes
+
+The headline number is **computed**, not produced by an LLM. `services/fit_analyzer.py`:
+
+```
+required_coverage  = matched_required / total_required        (weight 0.5)
+nice_to_have_cover = matched_nice     / total_nice            (weight 0.2)
+seniority_match    = 1.0 if resume_years >= jd_min_years
+                     else resume_years / jd_min_years         (weight 0.3)
+
+fit_score = round(100 * (0.5·required + 0.2·nice + 0.3·seniority))
+```
+
+Skill matching (`services/skill_matcher.py`) is itself hybrid: a keyword check first, then a cosine
+similarity fallback against the résumé's skill vectors (so "Container orchestration" can match
+"Kubernetes"). The LLM only writes the **prose summary** and the **interview questions** *on top of*
+these numbers — it never invents the percentage. The result is explainable ("63 = 4/6 required +
+0/4 nice-to-have + full seniority"), reproducible across runs, and debuggable.
+
+---
+
+## Quality, evals & observability
+
+- **Retrieval-recall eval** (`tests/test_eval.py`) — a fixture of question→expected-section cases
+  asserts retrieval recall ≥ 0.8.
+- **LLM-as-judge groundedness gate** (`evals/judge.py`, `tests/test_llm_judge.py`) — a separate,
+  cheap Claude call scores each chat answer's faithfulness to the retrieved context on a 1–5 rubric;
+  the suite fails if the average drops below threshold. This runs in CI when secrets are present and
+  auto-skips locally when keys are absent.
+- **Guardrails** (`services/guardrails.py`) — query length cap, empty-query rejection, and PII
+  redaction (emails/phones) before anything is logged.
+- **Observability** — `structlog` emits JSON logs with a per-request id; **Langfuse** tracing wraps
+  the chat call (degrades to a no-op when unconfigured); and the UI header shows live
+  `model · tokens · latency` so cost is visible at a glance.
+
+---
+
+## API reference
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/resumes` | Upload a résumé PDF → parse, chunk, embed |
+| `GET`  | `/resumes/latest` | Most recently uploaded résumé (powers auto-load) |
+| `POST` | `/jobs` | Add a job → extract structured JD, chunk, embed |
+| `GET`  | `/jobs?resume_id=` | List jobs, with persisted fit scores for that résumé |
+| `POST` | `/fit/{resume_id}/{job_id}` | Compute fit + summary + interview questions |
+| `POST` | `/chat` | Grounded chat (SSE token stream) |
+| `GET`  | `/health` | Liveness |
+
+Full interactive docs at `http://localhost:8000/docs`.
+
+---
+
+## Project layout
+
+```
+newpage-career-intel/
+├── docker-compose.yml            # db (pgvector) + api + web, one command
+├── .github/workflows/ci.yml      # lint + unit + eval gate
+├── api/
+│   ├── app.py  config.py  db.py  seed.py
+│   ├── models/                   # SQLAlchemy: resume, job, chunk, fit, query
+│   ├── routers/                  # resumes, jobs, fit, chat (SSE)
+│   ├── services/                 # one module per responsibility (see pipeline above)
+│   ├── prompts/                  # versioned .txt prompts (not buried in code)
+│   ├── evals/judge.py            # LLM-as-judge groundedness scorer
+│   └── tests/                    # 22 tests + fixtures + eval set
+├── web/
+│   ├── app/                      # Next.js App Router (layout, page, globals)
+│   ├── components/               # ResumeUpload, JobList, FitDashboard, ChatPanel, …
+│   │   └── ui/                   # shadcn/ui primitives
+│   └── lib/                      # typed API client, SSE reader, types
+└── docs/                         # screenshots + design spec & plan
+```
+
+---
+
+## Testing & CI
+
+- **22 tests.** The 21 unit/integration/retrieval tests run against a **real** Postgres (no mocked
+  DB) with faked LLM/embedding clients — so they need zero API keys. The 22nd is the live
+  LLM-as-judge eval, marked `eval` and auto-skipped without keys.
+- **GitHub Actions** (`.github/workflows/ci.yml`): spins up a pgvector service, runs `ruff`, then
+  `pytest -m "not eval"`, then the LLM-judge eval **only when** `OPENAI_API_KEY` + `ANTHROPIC_API_KEY`
+  secrets are configured.
+
+```bash
+docker compose run --rm api ruff check .              # lint
+docker compose run --rm api pytest -q -m "not eval"   # fast, no keys
+docker compose run --rm api pytest -q                 # full, incl. eval
+```
+
+---
+
+## RAG / LLM decisions
+
+> ✍️ **In my words** — *the factual choices below are accurate; rewrite the prose in your own voice
+> before submitting — this section is heavily graded.*
+
+| Decision | Choice | Why |
+|---|---|---|
+| **Chunking** | Section-aware for résumés; recursive windows for JDs | Résumés are short + structured → section chunks keep bullets whole and enable section-filtered retrieval. JDs are prose → sliding window. |
+| **Embeddings** | OpenAI `text-embedding-3-small` (1536-d) | Cheap, fast, strong for short text at this corpus size. |
+| **LLM** | Anthropic Claude Sonnet 4.6 | Strong reasoning for extraction + summaries; follows the "cite your source" contract reliably. |
+| **Vector store** | Postgres + pgvector | One datastore for relational + vectors; no second system, no lock-in for a take-home. |
+| **Orchestration** | None — direct SDK calls | Full control over prompts, retries, observability; no framework abstraction to debug through. |
+| **Prompts** | Versioned `.txt` files | Diffable, iterable without code changes. |
+| **Context** | Explicit `[source §section]` tags | Gives the model a citation contract the UI can render. |
+| **Guardrails** | Length cap, PII redaction, "not in context" fallback | Cheap, defensible safety; keeps it on-topic. |
+| **Quality** | Deterministic score + retrieval-recall eval + LLM-judge gate | Score is computed & explainable; answers are scored for faithfulness, gated in CI. |
+
+---
 
 ## Key technical decisions
 
-> ✍️ **In my words** — *Ioannis: keep/trim these; add anything you'd defend in an interview.*
+> ✍️ **In my words** — *keep/trim; add anything you'd defend in an interview.*
 
-- Deterministic fit score over an LLM-generated percentage (explainability).
-- pgvector over a dedicated vector DB (simplicity, no lock-in at this scale).
-- Multi-provider: OpenAI for embeddings, Anthropic for chat (right tool per job).
-- No orchestration framework (control + debuggability).
-- Injected clients everywhere (`Embedder(client=...)`, `JdParser(client=...)`) so the whole
-  pipeline is testable without network access — the 21-test suite runs with zero API keys.
+- **Deterministic fit score** over an LLM-generated percentage (explainability + reproducibility).
+- **pgvector** over a dedicated vector DB (simplicity, no lock-in at this scale).
+- **Multi-provider**: OpenAI for embeddings, Anthropic for chat — right tool per job.
+- **No orchestration framework** (control + debuggability).
+- **Injected clients** everywhere (`Embedder(client=…)`, `JdParser(client=…)`) so the whole
+  pipeline is testable without network access — the suite runs with zero keys.
+
+---
 
 ## Engineering standards followed (and skipped)
 
-> ✍️ **In my words** — *Ioannis: this honesty is deliberate; adjust to match what you actually value.*
+> ✍️ **In my words** — *this honesty is deliberate; adjust to what you actually value.*
 
 **Followed:** containerized (one `docker compose up`); typed end-to-end (pydantic + SQLAlchemy 2.0 +
-TS strict); tested against a **real** Postgres (no mocked DB) including a retrieval-recall eval set
-**and an LLM-as-judge groundedness gate**; **GitHub Actions CI** (lint + unit + eval); structured
-JSON logging; file-based prompts; secrets via env with a committed `.env.example`.
+TS strict); tested against a real Postgres including a retrieval-recall eval **and** an LLM-as-judge
+groundedness gate; **GitHub Actions CI** (lint + unit + eval); structured JSON logging; file-based
+prompts; secrets via env with a committed `.env.example`.
 
-**Skipped (deliberately, for a take-home) — and what I'd add:**
+**Skipped deliberately — and what I'd add:**
 
 | Skipped | Why | Production answer |
 |---|---|---|
@@ -146,42 +312,55 @@ JSON logging; file-based prompts; secrets via env with a committed `.env.example
 | Rate limiting | Single user | Redis token bucket on `/chat` |
 | ANN vector index | Tiny dataset | HNSW/IVFFlat index once chunk count grows |
 
-## How I used AI tools in development
+---
 
-> ✍️ **In my words — WRITE THIS SECTION YOURSELF.** *Ioannis: the brief asks specifically how you
-> use AI coding tools, how you keep it repeatable/maintainable, and your do's & don'ts. This must be
-> your real workflow in your own words — do not ship a generated answer here. Bullet prompts to react to:*
-> - *Which tool(s) you used and for what (scaffolding/boilerplate/tests vs. design/prompts/scoring logic).*
-> - *How you kept the output reviewable — e.g. test-first, small commits, reviewing every diff.*
-> - *Where you deliberately did NOT trust the model and wrote/decided yourself (the chunking strategy, the scoring formula, the prompt contracts).*
-> - *Your do's & don'ts for AI-assisted work and how you make it repeatable (specs, plans, conventions).*
+## Productionizing
 
-## What I'd do differently with more time
+> ✍️ **In my words** — *replace with your own take; draft to react to.*
 
-> ✍️ **In my words** — *Ioannis: make these yours; suggestions to react to:*
-> - Per-JD scoring weights and salary normalization.
-> - Resume-tailoring suggestions ("rewrite this bullet for JD #2").
-> - Hybrid retrieval reranking; an ANN index.
-> - A real eval harness with labeled relevance judgments, gated in CI.
-> - Streaming the fit analysis, not just the chat.
-
-## Screenshots
-
-**Fit dashboard** — explainable score, skill gaps, candidate-voice summary, generated interview questions:
-
-![Fit dashboard](docs/screenshot-dashboard.png)
-
-**Grounded chat** — answers cite the résumé and job description:
-
-![Grounded chat](docs/screenshot-chat.png)
+- **Database:** managed Postgres+pgvector (RDS/Aurora, Cloud SQL); add an HNSW index on
+  `chunks.embedding` once the corpus grows past a flat-scan-friendly size.
+- **Storage:** uploaded PDFs to S3/GCS, ingested async (queue + worker), not on the API box.
+- **Compute:** api + web on ECS Fargate / Cloud Run behind a load balancer; secrets in a manager.
+- **Cost/scale:** cache embeddings (skip re-embedding identical chunks); rate-limit `/chat`.
+- **Reliability:** retries/backoff + circuit breaker on LLM calls; retrieval-only fallback if the
+  LLM is down.
+- **Quality in CI:** run both evals per PR and block merges on regression.
 
 ---
 
-## Project layout
+## How I used AI tools in development
 
-```
-api/   FastAPI backend — services/, routers/, models/, prompts/, observability/, tests/
-web/   Next.js workspace — app/, components/, lib/
-docs/  design spec + implementation plan (docs/superpowers/)
-docker-compose.yml   db (pgvector) + api + web
-```
+> ✍️ **WRITE THIS SECTION YOURSELF — do not ship a generated answer.** The brief asks specifically
+> how you use AI coding tools, how you keep the output repeatable/maintainable, and your do's &
+> don'ts. Prompts to react to:
+> - Which tool(s), and for what — scaffolding/boilerplate/tests vs. the parts you wrote/decided
+>   yourself (chunking strategy, the scoring formula, the prompt contracts).
+> - How you kept it reviewable — test-first, small commits, reviewing every diff.
+> - Where you deliberately did **not** trust the model, and why.
+> - Your do's & don'ts and how you make AI-assisted work repeatable (specs, plans, conventions).
+
+---
+
+## What I'd do differently with more time
+
+> ✍️ **In my words** — *make these yours.*
+
+- Recruiter view (one JD → many résumés ranked by candidate) — same engine, flipped.
+- Résumé tailoring: "rewrite this bullet to close the gap for JD #2," with a diff view.
+- Gap → learning plan generator.
+- Hybrid retrieval reranking + an ANN index.
+- Stream the fit analysis (today only the chat streams).
+- A labeled relevance-judgment eval harness, gated in CI.
+
+---
+
+## Screenshots
+
+**Fit dashboard** — explainable score, skill gaps, candidate-voice summary, generated questions:
+
+![Fit dashboard](docs/screenshot-dashboard.png)
+
+**Grounded chat** — answers cite the résumé and the job description:
+
+![Grounded chat](docs/screenshot-chat.png)
