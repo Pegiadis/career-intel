@@ -142,7 +142,6 @@ JSON logging; file-based prompts; secrets via env with a committed `.env.example
 |---|---|---|
 | Multi-user auth | Single-user local app | Auth provider + Postgres row-level security |
 | Cloud deploy | Out of scope | Terraform → Fargate/Cloud Run + managed pgvector + S3 |
-| CI/CD | Time | GitHub Actions running pytest + the eval set per PR |
 | E2E browser tests | Time | Playwright smoke flow |
 | Rate limiting | Single user | Redis token bucket on `/chat` |
 | ANN vector index | Tiny dataset | HNSW/IVFFlat index once chunk count grows |
