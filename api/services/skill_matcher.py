@@ -16,7 +16,8 @@ def match_skills(jd_skills: list[str], resume_text: str,
     low_resume = resume_text.lower()
     for skill in jd_skills:
         if skill.lower() in low_resume:
-            matched.append(skill); continue
+            matched.append(skill)
+            continue
         jv = jd_skill_vecs.get(skill)
         hit = jv is not None and any(
             _cosine(jv, rv) >= threshold for rv in resume_skill_vecs.values()

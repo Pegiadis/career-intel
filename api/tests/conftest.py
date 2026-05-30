@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy import text
-from db import engine, SessionLocal, init_db
+from db import SessionLocal, init_db
 
 
 @pytest.fixture(scope="session", autouse=True)

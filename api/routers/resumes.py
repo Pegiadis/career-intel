@@ -35,10 +35,12 @@ def ingest_resume(db: Session, filename: str, raw_text: str, embedder: Embedder)
 
 @router.post("", response_model=ResumeOut)
 async def upload_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    import tempfile, os
+    import tempfile
+    import os
     data = await file.read()
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
-        f.write(data); path = f.name
+        f.write(data)
+        path = f.name
     try:
         raw = extract_text(path)
     finally:
