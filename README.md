@@ -167,8 +167,13 @@ structured JSON logging; file-based prompts; secrets via env with a committed `.
 
 ## Screenshots
 
-> Add 3–5 screenshots to `docs/` and reference them here, e.g.:
-> `![workspace](docs/screenshot-workspace.png)`
+**Fit dashboard** — explainable score, skill gaps, candidate-voice summary, generated interview questions:
+
+![Fit dashboard](docs/screenshot-dashboard.png)
+
+**Grounded chat** — answers cite the résumé and job description:
+
+![Grounded chat](docs/screenshot-chat.png)
 
 ---
 
