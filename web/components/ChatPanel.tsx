@@ -1,6 +1,8 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { MessageSquareText, Send, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { streamChat } from "@/lib/sse";
 import { toast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
@@ -12,19 +14,89 @@ interface Msg { role: "me" | "ai"; text: string; }
 
 const CITE = /(\[[^\]]*§[^\]]*\])/g;
 
+// Turn `[resume §skills]` tokens inside any string into styled chips, recursively,
+// so citations render correctly even inside markdown paragraphs, list items, and tables.
+function withCitations(children: ReactNode): ReactNode {
+  if (typeof children === "string") {
+    return children.split(CITE).map((part, i) =>
+      /^\[[^\]]*§[^\]]*\]$/.test(part) ? (
+        <span
+          key={i}
+          title="Source citation"
+          className="mx-0.5 inline-flex cursor-help items-center rounded bg-primary/10 px-1.5 py-0.5 align-baseline font-mono text-[10px] font-medium text-primary"
+        >
+          {part.replace(/[[\]]/g, "")}
+        </span>
+      ) : (
+        part
+      ),
+    );
+  }
+  if (Array.isArray(children)) return children.map((c, i) => <span key={i}>{withCitations(c)}</span>);
+  return children;
+}
+
+const MD_COMPONENTS = {
+  p: ({ children }: { children?: ReactNode }) => (
+    <p className="mb-2 last:mb-0 leading-relaxed">{withCitations(children)}</p>
+  ),
+  strong: ({ children }: { children?: ReactNode }) => (
+    <strong className="font-semibold">{withCitations(children)}</strong>
+  ),
+  em: ({ children }: { children?: ReactNode }) => <em>{withCitations(children)}</em>,
+  ul: ({ children }: { children?: ReactNode }) => (
+    <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>
+  ),
+  ol: ({ children }: { children?: ReactNode }) => (
+    <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>
+  ),
+  li: ({ children }: { children?: ReactNode }) => <li>{withCitations(children)}</li>,
+  a: ({ href, children }: { href?: string; children?: ReactNode }) => (
+    <a href={href} target="_blank" rel="noreferrer" className="text-primary underline">
+      {children}
+    </a>
+  ),
+  code: ({ children }: { children?: ReactNode }) => (
+    <code className="rounded bg-secondary px-1 py-0.5 font-mono text-[11px]">{children}</code>
+  ),
+  pre: ({ children }: { children?: ReactNode }) => (
+    <pre className="mb-2 overflow-x-auto rounded-lg bg-secondary p-3 text-[11px]">{children}</pre>
+  ),
+  table: ({ children }: { children?: ReactNode }) => (
+    <div className="mb-2 overflow-x-auto">
+      <table className="w-full border-collapse text-[12px]">{children}</table>
+    </div>
+  ),
+  thead: ({ children }: { children?: ReactNode }) => (
+    <thead className="bg-secondary">{children}</thead>
+  ),
+  th: ({ children }: { children?: ReactNode }) => (
+    <th className="border border-border px-2 py-1 text-left font-semibold">{withCitations(children)}</th>
+  ),
+  td: ({ children }: { children?: ReactNode }) => (
+    <td className="border border-border px-2 py-1 align-top">{withCitations(children)}</td>
+  ),
+  h1: ({ children }: { children?: ReactNode }) => (
+    <h3 className="mb-1 mt-2 font-display text-base">{withCitations(children)}</h3>
+  ),
+  h2: ({ children }: { children?: ReactNode }) => (
+    <h3 className="mb-1 mt-2 font-display text-base">{withCitations(children)}</h3>
+  ),
+  h3: ({ children }: { children?: ReactNode }) => (
+    <h4 className="mb-1 mt-2 font-semibold">{withCitations(children)}</h4>
+  ),
+  blockquote: ({ children }: { children?: ReactNode }) => (
+    <blockquote className="mb-2 border-l-2 border-primary/40 pl-3 text-foreground/70">
+      {children}
+    </blockquote>
+  ),
+};
+
 function renderAnswer(text: string) {
-  return text.split(CITE).map((part, i) =>
-    /^\[[^\]]*§[^\]]*\]$/.test(part) ? (
-      <span
-        key={i}
-        title="Source citation"
-        className="mx-0.5 inline-flex cursor-help items-center rounded bg-primary/10 px-1.5 py-0.5 align-baseline font-mono text-[10px] font-medium text-primary"
-      >
-        {part.replace(/[[\]]/g, "")}
-      </span>
-    ) : (
-      <span key={i}>{part}</span>
-    ),
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+      {text}
+    </ReactMarkdown>
   );
 }
 
