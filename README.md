@@ -77,10 +77,10 @@ docker compose run --rm api pytest -q -m "not eval"   # 21 tests, no keys
 docker compose run --rm api pytest -q                  # 22 tests, incl. live LLM-judge eval
 ```
 
-> **Port note:** Postgres is published on host port **5434** (not 5432) to avoid colliding with a
-> local Postgres. Inside the Docker network the DB is always `db:5432`, so `DATABASE_URL` is
-> unaffected. If host port 3000/8000 is taken, remap the `web`/`api` `ports:` in
-> `docker-compose.yml` and set `NEXT_PUBLIC_API_URL` to match.
+> **Port note:** if host ports 3000, 8000, or 5432 are already in use on your machine, remap the
+> `web`/`api`/`db` `ports:` in `docker-compose.yml` (or add a `docker-compose.override.yml`) and set
+> `NEXT_PUBLIC_API_URL` to match. Inside the Docker network the DB is always `db:5432`, so
+> `DATABASE_URL` is unaffected.
 
 ---
 
