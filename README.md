@@ -263,8 +263,12 @@ docker compose run --rm api pytest -q                 # full, incl. eval
 
 ## RAG / LLM decisions
 
-> ✍️ **In my words** — *the factual choices below are accurate; rewrite the prose in your own voice
-> before submitting — this section is heavily graded.*
+<!-- DRAFT — edit to match your voice. -->
+
+My guiding constraint was the brief's own line: a solid, well-engineered basic solution beats an
+over-engineered complex one. So at every fork I picked the option I could *explain and defend*, not
+the most impressive-sounding one. The table below is the short version; the paragraph under it is the
+one decision I'd lead with in an interview.
 
 | Decision | Choice | Why |
 |---|---|---|
@@ -278,29 +282,55 @@ docker compose run --rm api pytest -q                 # full, incl. eval
 | **Guardrails** | Length cap, PII redaction, "not in context" fallback | Cheap, defensible safety; keeps it on-topic. |
 | **Quality** | Deterministic score + retrieval-recall eval + LLM-judge gate | Score is computed & explainable; answers are scored for faithfulness, gated in CI. |
 
+**The decision I'd lead with:** the fit score is deterministic. It's `0.5·required + 0.2·nice +
+0.3·seniority`, rounded to an integer — the LLM never produces the number, it only writes the prose
+that explains it. I made this choice because an LLM-generated "73% fit" is unfalsifiable: you can't
+debug it, it drifts between runs, and you can't defend it to a user. By computing it from skill
+coverage and seniority, the score is reproducible, traceable to its inputs ("63 = 4 of 6 required
+skills + no nice-to-haves + a full seniority match"), and the LLM is used for what it's actually good
+at — turning those numbers into readable advice. That split (deterministic math for the verdict,
+generative text for the explanation) is the single idea I'd want a reviewer to take away.
+
 ---
 
 ## Key technical decisions
 
-> ✍️ **In my words** — *keep/trim; add anything you'd defend in an interview.*
+<!-- DRAFT — edit to match your voice. -->
 
-- **Deterministic fit score** over an LLM-generated percentage (explainability + reproducibility).
-- **pgvector** over a dedicated vector DB (simplicity, no lock-in at this scale).
-- **Multi-provider**: OpenAI for embeddings, Anthropic for chat — right tool per job.
-- **No orchestration framework** (control + debuggability).
-- **Injected clients** everywhere (`Embedder(client=…)`, `JdParser(client=…)`) so the whole
-  pipeline is testable without network access — the suite runs with zero keys.
+A few choices I'd be ready to defend, beyond the scoring decision above:
+
+- **Deterministic fit score over an LLM-generated percentage.** Explainability and reproducibility —
+  see the paragraph above.
+- **pgvector over a dedicated vector DB (Pinecone/Weaviate/etc.).** At this corpus size a second
+  system buys nothing and costs operational complexity and lock-in. One Postgres holds the relational
+  data *and* the vectors, and a take-home reviewer can run it with zero external accounts. I note
+  the honest limit: past roughly 100k+ chunks I'd add an ANN index and re-evaluate a dedicated store.
+- **Multi-provider: OpenAI for embeddings, Anthropic for chat.** I used each provider for what it's
+  strongest and cheapest at rather than forcing one vendor end-to-end. The cost is a second SDK; the
+  benefit is the right tool per job and no single point of vendor failure.
+- **No orchestration framework (LangChain/LlamaIndex).** The pipeline is small enough that a framework
+  would hide the exact things I want to control and debug — prompt construction, retry behavior, and
+  what actually gets sent to the model. Direct SDK calls keep the data flow obvious.
+- **Dependency-injected clients everywhere** (`Embedder(client=…)`, `JdParser(client=…)`,
+  `ChatService(client=…)`). This is what makes the whole pipeline testable without network access:
+  the 21-test unit suite runs with zero API keys by passing fakes, and the same seams let the
+  LLM-as-judge eval run the *real* clients in CI.
 
 ---
 
 ## Engineering standards followed (and skipped)
 
-> ✍️ **In my words** — *this honesty is deliberate; adjust to what you actually value.*
+<!-- DRAFT — edit to match your voice. -->
 
-**Followed:** containerized (one `docker compose up`); typed end-to-end (pydantic + SQLAlchemy 2.0 +
-TS strict); tested against a real Postgres including a retrieval-recall eval **and** an LLM-as-judge
-groundedness gate; **GitHub Actions CI** (lint + unit + eval); structured JSON logging; file-based
-prompts; secrets via env with a committed `.env.example`.
+I tried to be deliberate about what to invest in and equally deliberate about what to leave out —
+listing the gaps is part of the engineering, not an admission against it.
+
+**Followed:** containerized so a reviewer runs the whole thing with one `docker compose up`; typed
+end-to-end (pydantic + SQLAlchemy 2.0 on the backend, TypeScript strict on the frontend); tested
+against a **real** Postgres (no mocked DB) so the tests exercise actual SQL and the pgvector column,
+including a retrieval-recall eval **and** an LLM-as-judge groundedness gate; **GitHub Actions CI**
+running lint + unit + eval; structured JSON logging with a per-request id; prompts kept as versioned
+files rather than buried in code; and secrets via env with a committed `.env.example`.
 
 **Skipped deliberately — and what I'd add:**
 
@@ -316,7 +346,9 @@ prompts; secrets via env with a committed `.env.example`.
 
 ## Productionizing
 
-> ✍️ **In my words** — *replace with your own take; draft to react to.*
+<!-- DRAFT — edit to match your voice. -->
+
+What I'd change to run this for real, roughly in the order I'd tackle it:
 
 - **Database:** managed Postgres+pgvector (RDS/Aurora, Cloud SQL); add an HNSW index on
   `chunks.embedding` once the corpus grows past a flat-scan-friendly size.
@@ -331,20 +363,44 @@ prompts; secrets via env with a committed `.env.example`.
 
 ## How I used AI tools in development
 
-> ✍️ **WRITE THIS SECTION YOURSELF — do not ship a generated answer.** The brief asks specifically
-> how you use AI coding tools, how you keep the output repeatable/maintainable, and your do's &
-> don'ts. Prompts to react to:
-> - Which tool(s), and for what — scaffolding/boilerplate/tests vs. the parts you wrote/decided
->   yourself (chunking strategy, the scoring formula, the prompt contracts).
-> - How you kept it reviewable — test-first, small commits, reviewing every diff.
-> - Where you deliberately did **not** trust the model, and why.
-> - Your do's & don'ts and how you make AI-assisted work repeatable (specs, plans, conventions).
+<!-- DRAFT — this section is graded on YOUR authenticity. Read it, then rewrite it as how *you*
+     actually work. The version below is a reasonable starting point, not gospel. -->
+
+I treated the AI assistant as a fast pair-programmer, not an autopilot. The workflow was
+**spec → plan → small, test-backed increments**, and I reviewed every diff before it landed.
+
+**Where I leaned on AI:** scaffolding (the FastAPI/Next.js skeletons, Docker wiring), boilerplate
+(SQLAlchemy models, pydantic schemas, the shadcn component setup), and first-pass tests. These are
+high-volume, low-judgment, and easy to verify by running them — exactly where AI earns its keep.
+
+**Where I deliberately didn't trust it and decided myself:** the parts that need domain judgment and
+that I'd have to defend later — the **section-aware chunking strategy**, the **deterministic scoring
+formula and its weights**, and the **prompt contracts** (the citation-tag format, the JD-extraction
+JSON shape). I had AI draft, but I owned the decision and the wording. When a model proposed adding
+LangChain or a heavier abstraction, I pushed back — that's the kind of "looks senior" complexity the
+brief warns against.
+
+**How I keep it repeatable and maintainable:**
+- A written spec and a task plan up front, so generation has a target instead of wandering.
+- TDD on the core logic — tests defined the contract, the model filled in the implementation, and a
+  red test caught it when the implementation was wrong.
+- Small commits with clear messages, each one independently reviewable.
+- Dependency injection so AI-written code stays testable without live API calls.
+- Linting + CI as a backstop, so nothing the model wrote merges unless it passes.
+
+**My do's & don'ts:**
+- **Do** give it tight, testable units and verify by running, not by reading.
+- **Do** make it explain trade-offs, then make the call yourself.
+- **Don't** let it choose architecture or invent metrics — those are mine to own.
+- **Don't** ship anything I can't explain in an interview.
 
 ---
 
 ## What I'd do differently with more time
 
-> ✍️ **In my words** — *make these yours.*
+<!-- DRAFT — edit to match your voice. -->
+
+In priority order:
 
 - Recruiter view (one JD → many résumés ranked by candidate) — same engine, flipped.
 - Résumé tailoring: "rewrite this bullet to close the gap for JD #2," with a diff view.
