@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "career-intel-api"
 version = "0.1.0"
@@ -11,6 +15,10 @@ dependencies = [
 ]
 [project.optional-dependencies]
 dev = ["pytest>=8.2", "pytest-asyncio>=0.23", "httpx>=0.27", "ruff>=0.5", "mypy>=1.10", "reportlab>=4.2"]
+
+[tool.setuptools]
+packages = ["models", "routers", "services", "observability", "evals"]
+py-modules = ["app", "config", "db", "schemas", "seed"]
 
 [tool.ruff]
 line-length = 100
