@@ -4,7 +4,9 @@ Analyze a résumé against multiple job descriptions and get back an **explainab
 a skill-gap breakdown, tailored interview questions, and a **grounded chat** that cites its
 sources. Built for the NewPage take-home (Option 4).
 
-![Fit dashboard](docs/screenshot-dashboard.png)
+![CareerIntel demo](docs/demo.gif)
+
+*Pick a job → explainable fit score, skill gaps, and generated interview questions → ask grounded, cited follow-ups.*
 
 > **Note to reviewers:** the sections tagged **✍️ In my words** are written by me, not generated.
 > The brief asked for my reasoning and my judgment about where LLM output is and isn't appropriate —
