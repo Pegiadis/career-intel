@@ -90,7 +90,12 @@ export default function Page() {
         {/* left rail */}
         <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-border bg-card/20 p-4">
           <RailLabel>Résumé</RailLabel>
-          <ResumeUpload current={resume} onUploaded={(r) => { setResume(r); refresh(r.id); }} />
+          <ResumeUpload current={resume} onUploaded={(r) => {
+            setResume(r);
+            setActiveJob(null);     // clear stale selection/analysis for the new résumé
+            setFit(null);
+            refresh(r.id);          // re-fetch jobs with the new résumé's scores
+          }} />
           <RailLabel>Jobs · ranked by fit</RailLabel>
           <JobList
             jobs={jobs}

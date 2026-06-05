@@ -26,19 +26,45 @@ export function ResumeUpload({ onUploaded, current }:
     }
   };
 
+  // one shared hidden input, always available
+  const fileInput = (
+    <input
+      ref={inputRef}
+      type="file"
+      accept="application/pdf"
+      className="hidden"
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        if (f) handle(f);
+        e.target.value = "";   // allow re-selecting the same file
+      }}
+    />
+  );
+
   if (shown) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border border-good/25 bg-good/5 p-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-good/15 text-good">
-          <FileText className="size-4" />
+      <div className="rounded-lg border border-good/25 bg-good/5 p-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-good/15 text-good">
+            <FileText className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{shown.filename}</p>
+            <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground tnum">
+              <CheckCircle2 className="size-3 text-good" />
+              {shown.section_count} sections · {shown.chunk_count} chunks
+            </p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{shown.filename}</p>
-          <p className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground tnum">
-            <CheckCircle2 className="size-3 text-good" />
-            {shown.section_count} sections · {shown.chunk_count} chunks
-          </p>
-        </div>
+        <button
+          onClick={() => inputRef.current?.click()}
+          disabled={loading}
+          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-border bg-background/40 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/60 hover:text-primary disabled:opacity-60"
+        >
+          {loading ? <Loader2 className="size-3.5 animate-spin text-primary" /> : <UploadCloud className="size-3.5" />}
+          {loading ? "Embedding…" : "Upload new résumé"}
+        </button>
+        {fileInput}
       </div>
     );
   }
@@ -60,16 +86,7 @@ export function ResumeUpload({ onUploaded, current }:
       <span className="text-xs text-muted-foreground">
         {loading ? "Embedding…" : "Drop a résumé PDF"}
       </span>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        className="hidden"
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) handle(f);
-        }}
-      />
+      {fileInput}
     </button>
   );
 }
